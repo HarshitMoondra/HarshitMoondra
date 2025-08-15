@@ -31,6 +31,7 @@ def decompose_ratio(M: int, N: int) -> tuple[int, int, int, int]:
       - (M1 * M2) / (N1 * N2) == M / N   (exactly)
       - max(|M1|, |M2|, |N1|, |N2|) ≤ 32
       - N1 and N2 are strictly positive (no division by zero)
+      - M1 ≤ N1 and M2 ≤ N2 (component-wise)
 
     Raises:
       - ZeroDivisionError if N == 0
@@ -51,10 +52,6 @@ def decompose_ratio(M: int, N: int) -> tuple[int, int, int, int]:
     a = abs(f.numerator)
     b = f.denominator
 
-    # Quick win if already within bounds
-    if a <= _MAX and b <= _MAX:
-        return (sign * a, 1, b, 1)
-
     # Find k such that a*k and b*k each factor into two numbers ≤ 32
     max_k = _MAX_PRODUCT // max(a, b)
     for k in range(1, max_k + 1):
@@ -72,15 +69,22 @@ def decompose_ratio(M: int, N: int) -> tuple[int, int, int, int]:
             x, y = pair
             return abs(x - y)
 
-        m1, m2 = min(num_pairs, key=score)
-        n1, n2 = min(den_pairs, key=score)
-        return (sign * m1, m2, n1, n2)
+        sorted_num_pairs = sorted(num_pairs, key=score)
+        sorted_den_pairs = sorted(den_pairs, key=score)
 
-    raise ValueError(f"No decomposition with each value ≤ {_MAX} exists for ratio {M}/{N}")
+        for m_a, m_b in sorted_num_pairs:
+            m_small, m_large = sorted((m_a, m_b))
+            for n_a, n_b in sorted_den_pairs:
+                n_small, n_large = sorted((n_a, n_b))
+                if m_small <= n_small and m_large <= n_large:
+                    # Place sign on M1
+                    return (sign * m_small, m_large, n_small, n_large)
+
+    raise ValueError(f"No decomposition with each value ≤ {_MAX} and M1≤N1, M2≤N2 exists for ratio {M}/{N}")
 
 
 def _main() -> None:
-    parser = argparse.ArgumentParser(description="Decompose ratio M/N into M1*M2/(N1*N2) with each ≤ 32")
+    parser = argparse.ArgumentParser(description="Decompose ratio M/N into M1*M2/(N1*N2) with each ≤ 32 and M1≤N1, M2≤N2")
     parser.add_argument("--M", type=int, required=True, help="Numerator M")
     parser.add_argument("--N", type=int, required=True, help="Denominator N")
     args = parser.parse_args()
